@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALPR v6 — NHẬN DIỆN BIỂN SỐ XE</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #05080d;
+  --surf:    #090e16;
+  --panel:   #0c1420;
+  --border:  #152338;
+  --accent:  #00d4ff;
+  --green:   #00ff88;
+  --orange:  #ff6b35;
+  --yellow:  #ffd700;
+  --red:     #ff3b6b;
+  --text:    #b8cdd8;
+  --dim:     #3a5060;
+  --mono:    'Share Tech Mono', monospace;
+  --display: 'Orbitron', sans-serif;
+  --body:    'Exo 2', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size:200px;}
+
+/* ── HEADER ── */
+header{flex-shrink:0;background:linear-gradient(180deg,#0b1525,var(--surf));
+  border-bottom:1px solid var(--border);padding:0 28px;height:56px;
+  display:flex;align-items:center;gap:16px;position:relative;}
+header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent 0%,var(--accent) 40%,var(--green) 60%,transparent 100%);}
+.logo{width:34px;height:34px;border:2px solid var(--accent);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  box-shadow:0 0 12px rgba(0,212,255,.35);}
+.brand h1{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:3px;
+  color:var(--accent);text-shadow:0 0 16px rgba(0,212,255,.5);}
+.brand p{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:2px;}
+.header-right{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.counter-badge{font-family:var(--mono);font-size:12px;color:var(--yellow);
+  border:1px solid rgba(255,215,0,.3);padding:4px 10px;border-radius:4px;
+  background:rgba(255,215,0,.05);display:none;}
+.live-badge{display:flex;align-items:center;gap:6px;font-family:var(--mono);
+  font-size:11px;letter-spacing:1px;padding:4px 12px;border-radius:4px;
+  border:1px solid rgba(0,255,136,.3);background:rgba(0,255,136,.05);
+  color:var(--green);transition:all .3s;}
+.live-badge.scanning{border-color:var(--accent);color:var(--accent);
+  background:rgba(0,212,255,.08);box-shadow:0 0 10px rgba(0,212,255,.2);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 6px var(--green);animation:blink 1.5s ease-in-out infinite;}
+.scanning .dot{background:var(--accent);box-shadow:0 0 8px var(--accent);
+  animation:spin-pulse .8s linear infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes spin-pulse{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
+
+/* ── LAYOUT ── */
+.workspace{flex:1;display:grid;grid-template-columns:215px 1fr;overflow:hidden;}
+
+/* ── LEFT ── */
+.left{background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;}
+.left::-webkit-scrollbar{width:4px;}
+.left::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.section{padding:13px 14px;border-bottom:1px solid var(--border);}
+.slabel{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--dim);margin-bottom:8px;display:block;}
+
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:16px 10px;
+  text-align:center;cursor:pointer;position:relative;transition:all .3s;
+  background:rgba(0,212,255,.02);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);
+  background:rgba(0,212,255,.07);box-shadow:0 0 20px rgba(0,212,255,.1) inset;}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.upload-zone .uz-icon{font-size:22px;margin-bottom:5px;}
+.upload-zone h3{font-family:var(--display);font-size:11px;letter-spacing:2px;
+  color:var(--accent);margin-bottom:3px;}
+.upload-zone p{font-size:10px;color:var(--dim);}
+
+#fileInfo{display:none;}
+.fi-row{display:flex;align-items:center;gap:8px;}
+.fi-icon{font-size:16px;}
+.fi-name{font-family:var(--mono);font-size:10px;color:var(--accent);word-break:break-all;}
+.fi-meta{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:2px;}
+
+/* Preview */
+#previewWrap{border-radius:6px;overflow:hidden;border:1px solid var(--border);
+  background:#000;min-height:120px;display:flex;align-items:center;
+  justify-content:center;position:relative;}
+#previewWrap img,#previewWrap video{max-width:100%;max-height:160px;display:none;}
+.prev-ph{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;padding:12px;}
+#previewWrap.scanning-anim{border-color:var(--accent);box-shadow:0 0 12px rgba(0,212,255,.25);}
+
+/* Video time indicator */
+#videoTimeBar{display:none;margin-top:8px;}
+.vt-row{display:flex;align-items:center;gap:8px;}
+.vt-label{font-family:var(--mono);font-size:9px;color:var(--dim);flex-shrink:0;}
+.vt-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.vt-fill{height:100%;width:0%;border-radius:2px;
+  background:linear-gradient(90deg,var(--green),var(--accent));transition:width .3s;}
+.vt-time{font-family:var(--mono);font-size:10px;color:var(--accent);flex-shrink:0;min-width:42px;text-align:right;}
+
+/* Progress */
+#progressSection{display:none;}
+.prog-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.prog-fill{height:100%;width:0%;border-radius:3px;
+  background:linear-gradient(90deg,var(--accent),var(--green));
+  transition:width .4s ease-out;box-shadow:0 0 8px var(--accent);}
+.prog-label{font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:5px;text-align:center;}
+.prog-detail{font-family:var(--mono);font-size:9px;color:var(--dim);text-align:center;margin-top:2px;}
+
+/* Stats */
+.stats-row{display:flex;gap:5px;}
+.stat-box{flex:1;background:rgba(0,0,0,.3);border:1px solid var(--border);
+  border-radius:5px;padding:7px 5px;text-align:center;}
+.stat-num{font-family:var(--display);font-size:14px;color:var(--accent);}
+.stat-lbl{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:1px;margin-top:2px;}
+
+/* ── BUTTONS ── */
+.btn-row{display:flex;gap:8px;}
+#runBtn{
+  flex:1;padding:12px 8px;
+  background:linear-gradient(135deg,#003d55,#005c70);
+  border:1px solid var(--accent);color:var(--accent);
+  font-family:var(--display);font-size:12px;letter-spacing:3px;
+  border-radius:8px;cursor:pointer;transition:all .3s;
+  box-shadow:0 0 14px rgba(0,212,255,.1);position:relative;overflow:hidden;}
+#runBtn:hover:not(:disabled){
+  background:linear-gradient(135deg,#005c70,#007a8a);
+  box-shadow:0 0 22px rgba(0,212,255,.25);transform:translateY(-1px);}
+#runBtn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+#runBtn::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);
+  transition:left .6s;}
+#runBtn:hover:not(:disabled)::after{left:100%;}
+#stopBtn{
+  display:none;padding:12px 10px;
+  background:rgba(255,59,107,.08);
+  border:1px solid var(--red);color:var(--red);
+  font-family:var(--display);font-size:11px;letter-spacing:2px;
+  border-radius:8px;cursor:pointer;transition:all .25s;
+  white-space:nowrap;flex-shrink:0;}
+#stopBtn:hover{background:rgba(255,59,107,.18);box-shadow:0 0 14px rgba(255,59,107,.2);}
+
+/* ── RIGHT ── */
+.right{display:flex;flex-direction:column;overflow:hidden;background:var(--surf);}
+.right-header{flex-shrink:0;padding:10px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.right-title{font-family:var(--display);font-size:13px;letter-spacing:3px;color:var(--text);}
+.hint-lbl{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1px;display:none;}
+.right-actions{margin-left:auto;display:flex;gap:8px;}
+.action-btn{background:transparent;border:1px solid rgba(255,107,53,.35);color:var(--orange);
+  font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:4px 10px;
+  border-radius:4px;cursor:pointer;transition:all .2s;display:none;}
+.action-btn:hover{background:rgba(255,107,53,.1);}
+
+/* ── RESULTS ── */
+.results-outer{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.results-outer::-webkit-scrollbar{width:5px;}
+.results-outer::-webkit-scrollbar-track{background:transparent;}
+.results-outer::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+#emptyState{min-height:280px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;color:var(--dim);}
+.empty-icon{font-size:48px;opacity:.18;}
+.empty-text{font-family:var(--mono);font-size:11px;letter-spacing:3px;}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px;}
+
+/* ── PLATE CARD ── */
+.plate-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;animation:popIn .32s cubic-bezier(.34,1.56,.64,1) forwards;
+  opacity:0;transform:scale(.93);cursor:pointer;transition:border-color .2s,box-shadow .2s;}
+.plate-card:hover{border-color:var(--accent);box-shadow:0 0 16px rgba(0,212,255,.15);}
+@keyframes popIn{to{opacity:1;transform:scale(1);}}
+.plate-card.flash{border-color:var(--yellow) !important;animation:flash-y .5s ease;}
+@keyframes flash-y{0%{box-shadow:0 0 0 rgba(255,215,0,0)}45%{box-shadow:0 0 18px rgba(255,215,0,.5)}100%{box-shadow:0 0 0 rgba(255,215,0,0)}}
+
+/* Crop strip */
+.card-crop{width:100%;height:52px;background:#000;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  border-bottom:1px solid rgba(0,212,255,.12);position:relative;}
+.card-crop img{max-width:100%;max-height:100%;object-fit:contain;
+  image-rendering:crisp-edges;display:block;}
+.crop-placeholder{display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;font-family:var(--mono);font-size:8px;
+  color:var(--dim);letter-spacing:1px;}
+.crop-lbl{position:absolute;bottom:2px;left:4px;font-family:var(--mono);
+  font-size:7px;color:var(--dim);letter-spacing:1px;opacity:.6;}
+
+/* Full frame thumb */
+.card-thumb{width:100%;height:90px;overflow:hidden;position:relative;
+  display:flex;align-items:center;justify-content:center;background:#000;}
+.card-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.thumb-placeholder{display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;font-family:var(--mono);font-size:8px;
+  color:var(--dim);letter-spacing:1px;}
+/* Loading spinner */
+.img-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.7);font-family:var(--mono);font-size:9px;color:var(--dim);
+  letter-spacing:1px;}
+.card-badge{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.85);
+  border:1px solid var(--accent);color:var(--accent);
+  font-family:var(--mono);font-size:8px;padding:2px 5px;border-radius:3px;z-index:2;}
+.update-tag{position:absolute;top:4px;right:4px;background:rgba(255,215,0,.12);
+  border:1px solid rgba(255,215,0,.45);color:var(--yellow);
+  font-family:var(--mono);font-size:7px;letter-spacing:1px;padding:2px 5px;
+  border-radius:3px;display:none;z-index:2;}
+.view-hint{position:absolute;inset:0;background:rgba(0,212,255,.08);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:2px;
+  opacity:0;transition:opacity .2s;z-index:3;}
+.plate-card:hover .view-hint{opacity:1;}
+
+.card-body{padding:9px 11px;}
+.plate-num{font-family:var(--display);font-size:17px;font-weight:900;letter-spacing:3px;
+  color:var(--accent);text-shadow:0 0 10px rgba(0,212,255,.35);
+  line-height:1;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.conf-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;}
+.conf-lbl{font-family:var(--mono);font-size:7px;color:var(--dim);letter-spacing:2px;flex-shrink:0;}
+.conf-val{font-family:var(--mono);font-size:11px;font-weight:700;min-width:50px;}
+.conf-val.hi{color:var(--green);}
+.conf-val.md{color:var(--yellow);}
+.conf-val.lo{color:var(--orange);}
+.conf-track{flex:1;height:2px;background:var(--border);border-radius:1px;overflow:hidden;}
+.conf-fill{height:100%;border-radius:1px;
+  background:linear-gradient(90deg,var(--accent),var(--green));transition:width .5s;}
+
+/* Timestamp badge */
+.card-footer{display:flex;align-items:center;justify-content:space-between;}
+.time-val{font-family:var(--mono);font-size:8px;color:var(--dim);}
+.video-ts{font-family:var(--mono);font-size:9px;color:var(--yellow);
+  background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);
+  padding:1px 5px;border-radius:3px;letter-spacing:1px;}
+
+/* ── MODAL ── */
+#modal{position:fixed;inset:0;z-index:8000;display:none;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.84);backdrop-filter:blur(5px);}
+#modal.open{display:flex;}
+.modal-box{background:var(--panel);border:1px solid rgba(0,212,255,.35);border-radius:12px;
+  max-width:900px;width:95%;max-height:90vh;overflow-y:auto;position:relative;
+  box-shadow:0 0 50px rgba(0,212,255,.18);animation:modalIn .22s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.modal-close{position:absolute;top:12px;right:14px;background:transparent;border:none;
+  color:var(--dim);font-size:18px;cursor:pointer;z-index:1;line-height:1;transition:color .2s;}
+.modal-close:hover{color:var(--red);}
+.modal-inner{padding:20px 20px 18px;}
+.modal-header{margin-bottom:14px;}
+.modal-plate{font-family:var(--display);font-size:26px;font-weight:900;letter-spacing:6px;
+  color:var(--accent);text-shadow:0 0 16px rgba(0,212,255,.4);margin-bottom:4px;}
+.modal-meta{display:flex;gap:16px;flex-wrap:wrap;}
+.modal-conf{font-family:var(--mono);font-size:11px;color:var(--dim);}
+.modal-ts{font-family:var(--mono);font-size:11px;color:var(--yellow);}
+.modal-imgs{display:grid;grid-template-columns:1fr 2fr;gap:10px;}
+.modal-lbl{font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--dim);
+  padding:5px 8px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.3);}
+.modal-crop-wrap{background:#000;border:1px solid var(--border);border-radius:7px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;padding:6px;min-height:70px;}
+.modal-crop-wrap img{max-width:100%;max-height:160px;object-fit:contain;image-rendering:crisp-edges;}
+.modal-full-wrap{background:#000;border:1px solid var(--border);border-radius:7px;overflow:hidden;
+  min-height:70px;display:flex;align-items:center;justify-content:center;}
+.modal-full-wrap img{width:100%;display:block;}
+.modal-no-img{font-family:var(--mono);font-size:9px;color:var(--dim);padding:20px;text-align:center;}
+
+/* Toast */
+#toast{position:fixed;bottom:18px;right:18px;z-index:9999;background:var(--panel);
+  border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);
+  font-size:11px;letter-spacing:1px;padding:8px 14px;border-radius:6px;
+  box-shadow:0 0 16px rgba(0,212,255,.18);opacity:0;transform:translateY(36px);
+  transition:all .28s;pointer-events:none;max-width:340px;word-break:break-word;}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.err{border-color:var(--red);color:var(--red);box-shadow:0 0 16px rgba(255,59,107,.18);}
+
+@media(max-width:820px){
+  .workspace{grid-template-columns:1fr;}
+  .left{max-height:44vh;}
+  .modal-imgs{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🚗</div>
+  <div class="brand">
+    <h1>HỆ THỐNG NHẬN DIỆN BIỂN SỐ XE</h1>
+    <p>ALPR v6 // YOLO + CNN ENSEMBLE // 1FPS // SMART FILTER // VN PLATE</p>
+  </div>
+  <div class="header-right">
+    <div class="counter-badge" id="counterBadge">0 BIỂN SỐ</div>
+    <div class="live-badge" id="liveBadge">
+      <div class="dot"></div>
+      <span id="liveText">SERVER ONLINE</span>
+    </div>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- ── LEFT PANEL ── -->
+  <div class="left">
+
+    <div class="section">
+      <span class="slabel">// NGUỒN DỮ LIỆU</span>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/*,video/*">
+        <div class="uz-icon">📂</div>
+        <h3>CHỌN FILE</h3>
+        <p>Ảnh JPG/PNG hoặc Video MP4/AVI/MOV</p>
+        <p style="margin-top:3px;font-size:9px;color:var(--dim)">hoặc kéo & thả</p>
+      </div>
+    </div>
+
+    <div class="section" id="fileInfo">
+      <span class="slabel">// THÔNG TIN FILE</span>
+      <div class="fi-row">
+        <div class="fi-icon" id="fiIcon">📄</div>
+        <div>
+          <div class="fi-name" id="fiName">—</div>
+          <div class="fi-meta" id="fiMeta">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <span class="slabel">// XEM TRƯỚC</span>
+      <div id="previewWrap">
+        <div class="prev-ph">[ CHƯA CÓ FILE ]</div>
+        <img id="imgPrev" alt="preview">
+        <video id="vidPrev" controls></video>
+      </div>
+      <!-- Video timeline bar -->
+      <div id="videoTimeBar">
+        <div class="vt-row">
+          <span class="vt-label">VID</span>
+          <div class="vt-track"><div class="vt-fill" id="vtFill"></div></div>
+          <span class="vt-time" id="vtTime">00:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="progressSection">
+      <span class="slabel">// TIẾN TRÌNH QUÉT</span>
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-label" id="progLabel">—</div>
+      <div class="prog-detail" id="progDetail"></div>
+    </div>
+
+    <div class="section" id="statsSection" style="display:none">
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-num" id="statPlates">0</div>
+          <div class="stat-lbl">BIỂN SỐ</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statTime">0S</div>
+          <div class="stat-lbl">THỰC TẾ</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statVideoSec">0S</div>
+          <div class="stat-lbl">VIDEO</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="btn-row">
+        <button id="runBtn" onclick="runRecognition()">▶ BẮT ĐẦU</button>
+        <button id="stopBtn" onclick="stopRecognition()">■ DỪNG</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="right">
+    <div class="right-header">
+      <div class="right-title" id="rightTitle">KẾT QUẢ NHẬN DIỆN</div>
+      <span class="hint-lbl" id="hintLbl">💡 Nhấn thẻ để xem chi tiết</span>
+      <div class="right-actions">
+        <button class="action-btn" id="clearBtn" onclick="clearResults()">✕ XÓA TẤT CẢ</button>
+      </div>
+    </div>
+    <div class="results-outer">
+      <div id="emptyState">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">CHƯA CÓ KẾT QUẢ</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:2px;margin-top:5px">
+          CHỌN FILE VÀ NHẤN BẮT ĐẦU
+        </div>
+      </div>
+      <div id="grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── MODAL ── -->
+<div id="modal" onclick="closeBg(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-inner">
+      <div class="modal-header">
+        <div class="modal-plate" id="modalPlate">—</div>
+        <div class="modal-meta">
+          <span class="modal-conf" id="modalConf">—</span>
+          <span class="modal-ts"  id="modalTs" style="display:none">—</span>
+        </div>
+      </div>
+      <div class="modal-imgs">
+        <div>
+          <div class="modal-lbl">// ẢNH BIỂN SỐ (CẮT)</div>
+          <div class="modal-crop-wrap" id="modalCropWrap">
+            <img id="modalCropImg" src="" alt="plate crop">
+          </div>
+        </div>
+        <div>
+          <div class="modal-lbl">// KHUNG NHẬN DIỆN</div>
+          <div class="modal-full-wrap" id="modalFullWrap">
+            <img id="modalFullImg" src="" alt="full frame">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let cardCount     = 0;
+let scanStart     = 0;
+let plateMap      = {};
+let statsTimer    = null;
+let isVideo       = false;
+let isScanning    = false;
+let _totalFrames  = 0;
+let _videoFps     = 25;
+let _totalDurSec  = 0;
+
+// ═══════════════════════════════════════════════════════════════
+// BASE64 VALIDATION — FIX TÀN HÌNH
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Kiểm tra chuỗi base64 JPEG hợp lệ trước khi tạo src.
+ * Nguyên nhân chính gây tàn hình:
+ *   1. Server trả về '' hoặc null khi encode lỗi
+ *   2. Chuỗi quá ngắn (< 1000 chars) — không phải ảnh thực
+ *   3. Ký tự không hợp lệ trong base64
+ */
+function isValidBase64(str) {
+  if (!str || typeof str !== 'string') return false;
+  // JPEG base64 phải bắt đầu bằng /9j/ (FFD8FF)
+  if (!str.startsWith('/9j/') && str.length < 1000) return false;
+  // Độ dài tối thiểu cho ảnh JPEG hợp lệ
+  if (str.length < 500) return false;
+  // Kiểm tra ký tự base64 hợp lệ (loại trừ newline/space cuối)
+  const cleaned = str.replace(/[\r\n =]/g, '');
+  return /^[A-Za-z0-9+/]*={0,2}$/.test(cleaned.slice(-4));
+}
+
+function makeImgSrc(b64) {
+  if (!isValidBase64(b64)) return null;
+  return `data:image/jpeg;base64,${b64}`;
+}
+
+/**
+ * Load ảnh với retry và timeout — tránh trường hợp ảnh load lỗi im lặng.
+ * @param {HTMLImageElement} imgEl - Element img cần load
+ * @param {string} b64 - Chuỗi base64
+ * @param {HTMLElement} placeholder - Element hiển thị khi lỗi
+ * @param {string} placeholderText - Text hiển thị khi lỗi
+ */
+function safeLoadImage(imgEl, b64, placeholder, placeholderText) {
+  const src = makeImgSrc(b64);
+  if (!src) {
+    if (placeholder) {
+      placeholder.textContent = placeholderText || '[NO IMG]';
+      placeholder.style.display = 'flex';
+    }
+    imgEl.style.display = 'none';
+    return false;
+  }
+
+  // Xoá placeholder cũ nếu có
+  if (placeholder) placeholder.style.display = 'none';
+
+  imgEl.onload = () => {
+    imgEl.style.display = 'block';
+    // Xoá loading indicator nếu có
+    const li = imgEl.closest('.card-thumb, .card-crop')
+                    ?.querySelector('.img-loading');
+    if (li) li.remove();
+  };
+  imgEl.onerror = () => {
+    imgEl.style.display = 'none';
+    if (placeholder) {
+      placeholder.textContent = placeholderText || '[IMG LỖI]';
+      placeholder.style.display = 'flex';
+    }
+  };
+  imgEl.src = src;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAG & DROP
+// ═══════════════════════════════════════════════════════════════
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', ()  => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  if (e.dataTransfer.files.length) {
+    document.getElementById('fileInput').files = e.dataTransfer.files;
+    previewMedia();
+  }
+});
+document.getElementById('fileInput').addEventListener('change', previewMedia);
+
+function previewMedia() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+  const img = document.getElementById('imgPrev');
+  const vid = document.getElementById('vidPrev');
+  document.querySelector('.prev-ph').style.display = 'none';
+  img.style.display = 'none';
+  vid.style.display = 'none';
+  const url = URL.createObjectURL(file);
+  if (file.type.startsWith('image/')) {
+    img.src = url;
+    img.style.display = 'block';
+    document.getElementById('videoTimeBar').style.display = 'none';
+  } else {
+    vid.src = url;
+    vid.style.display = 'block';
+    document.getElementById('videoTimeBar').style.display = 'block';
+  }
+  document.getElementById('fileInfo').style.display = 'block';
+  document.getElementById('fiIcon').textContent = file.type.startsWith('image/') ? '🖼' : '🎬';
+  document.getElementById('fiName').textContent = file.name.toUpperCase();
+  document.getElementById('fiMeta').textContent =
+    (file.type.startsWith('image/') ? 'ẢNH' : 'VIDEO') + ' · ' +
+    (file.size / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STOP
+// ═══════════════════════════════════════════════════════════════
+async function stopRecognition() {
+  try {
+    await fetch('http://127.0.0.1:5000/api/stop', { method: 'POST' });
+    toast('⏹ ĐÃ GỬI LỆNH DỪNG...');
+  } catch(e) {
+    toast('✕ KHÔNG KẾT NỐI SERVER!', true);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RUN RECOGNITION
+// ═══════════════════════════════════════════════════════════════
+async function runRecognition() {
+  const fileInput = document.getElementById('fileInput');
+  if (!fileInput.files[0]) { toast('⚠ HÃY CHỌN FILE TRƯỚC!', true); return; }
+  const file = fileInput.files[0];
+  isVideo = file.type.startsWith('video/') ||
+            /\.(mp4|avi|mov|mkv|webm|m4v)$/i.test(file.name);
+  _totalFrames = 0; _videoFps = 25; _totalDurSec = 0;
+  setScanning(true);
+  scanStart = Date.now();
+  startStatsTimer();
+  document.getElementById('rightTitle').textContent =
+    isVideo ? 'KẾT QUẢ NHẬN DIỆN VIDEO' : 'KẾT QUẢ NHẬN DIỆN ẢNH';
+  if (isVideo) await runVideoStream(file);
+  else         await runImage(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ẢNH TĨNH
+// ═══════════════════════════════════════════════════════════════
+async function runImage(file) {
+  setProgress(5, 'ĐANG GỬI ẢNH LÊN SERVER...', '');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r    = await fetch('http://127.0.0.1:5000/api/recognize_image',
+                             { method: 'POST', body: fd });
+    const data = await r.json();
+    setProgress(100, 'HOÀN TẤT!', '');
+    if (data.success) {
+      data.results.forEach(p => addOrUpdateCard(p));
+      toast(`✓ NHẬN DIỆN XONG: ${data.results.length} BIỂN SỐ`);
+    } else {
+      toast('✕ ' + (data.error || 'LỖI KHÔNG RÕ'), true);
+    }
+  } catch(e) {
+    toast('✕ KHÔNG KẾT NỐI ĐƯỢC SERVER!', true);
+  } finally {
+    setScanning(false);
+    setTimeout(() => {
+      document.getElementById('progressSection').style.display = 'none';
+    }, 2000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VIDEO SSE STREAMING
+// ═══════════════════════════════════════════════════════════════
+async function runVideoStream(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const response = await fetch(
+      'http://127.0.0.1:5000/api/recognize_video',
+      { method: 'POST', body: fd }
+    );
+    if (!response.ok) {
+      toast('✕ SERVER LỖI: ' + response.status, true);
+      setScanning(false);
+      return;
+    }
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let   buffer  = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // phần chưa hoàn chỉnh
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          handleSSE(JSON.parse(line.slice(6)));
+        } catch (parseErr) {
+          console.warn('SSE parse error:', parseErr);
+        }
+      }
+    }
+  } catch(e) {
+    console.error('Stream error:', e);
+    toast('✕ MẤT KẾT NỐI VỚI SERVER!', true);
+  } finally {
+    setScanning(false);
+    setProgress(100, 'HOÀN TẤT!', `TỔNG: ${Object.keys(plateMap).length} BIỂN SỐ`);
+    setTimeout(() => {
+      document.getElementById('progressSection').style.display = 'none';
+    }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SSE EVENT HANDLER
+// ═══════════════════════════════════════════════════════════════
+function handleSSE(ev) {
+  switch (ev.type) {
+
+    case 'start': {
+      _totalFrames = ev.total_frames || 0;
+      _videoFps    = ev.fps || 25;
+      _totalDurSec = ev.duration_sec || Math.round(_totalFrames / _videoFps);
+      const durStr = formatSeconds(_totalDurSec);
+      setProgress(0, 'ĐANG QUÉT VIDEO...', `${durStr} · ${_videoFps.toFixed(1)}FPS · 1 FRAME/S`);
+      break;
+    }
+
+    case 'plate': {
+      addOrUpdateCard({
+        license_plate:  ev.license_plate,
+        confidence:     ev.confidence,
+        image_data:     ev.image_data,
+        plate_crop:     ev.plate_crop,
+        is_update:      ev.is_update,
+        timestamp:      ev.timestamp,
+        video_time_sec: ev.video_time_sec,
+      });
+      const pct     = ev.progress ?? 0;
+      const vidSec  = ev.video_time_sec ?? (ev.frame_idx / _videoFps);
+      const total   = Object.keys(plateMap).length;
+
+      // Cập nhật video timeline
+      updateVideoTimeline(vidSec);
+
+      setProgress(
+        pct,
+        `ĐANG QUÉT... ${pct.toFixed(0)}%`,
+        `${formatSeconds(Math.round(vidSec))} / ${formatSeconds(_totalDurSec)} · ${total} BIỂN SỐ`
+      );
+      document.getElementById('statVideoSec').textContent =
+        formatSeconds(Math.round(vidSec));
+      break;
+    }
+
+    case 'progress': {
+      const pct    = ev.progress ?? 0;
+      const vidSec = ev.video_time_sec ?? (ev.frame / _videoFps);
+      updateVideoTimeline(vidSec);
+      setProgress(
+        pct,
+        `ĐANG QUÉT... ${pct.toFixed(0)}%`,
+        `${formatSeconds(Math.round(vidSec))} / ${formatSeconds(_totalDurSec)} · ${ev.found} BIỂN SỐ`
+      );
+      document.getElementById('statVideoSec').textContent =
+        formatSeconds(Math.round(vidSec));
+      break;
+    }
+
+    case 'stopped':
+      toast('⏹ ĐÃ DỪNG QUÉT');
+      break;
+
+    case 'done':
+      toast(`✓ QUÉT XONG — ${ev.total_plates} BIỂN SỐ`);
+      setProgress(100, 'HOÀN TẤT!', `TỔNG: ${ev.total_plates} BIỂN SỐ`);
+      updateVideoTimeline(_totalDurSec);
+      break;
+
+    case 'error':
+      toast('✕ ' + (ev.message || 'LỖI SERVER'), true);
+      break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VIDEO TIMELINE
+// ═══════════════════════════════════════════════════════════════
+function updateVideoTimeline(currentSec) {
+  const fill = document.getElementById('vtFill');
+  const time = document.getElementById('vtTime');
+  if (!fill || !time) return;
+  const pct = _totalDurSec > 0
+    ? Math.min(100, (currentSec / _totalDurSec) * 100)
+    : 0;
+  fill.style.width = pct + '%';
+  time.textContent = formatSeconds(Math.round(currentSec));
+}
+
+function formatSeconds(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADD / UPDATE CARD
+// ═══════════════════════════════════════════════════════════════
+function addOrUpdateCard(plate) {
+  const { license_plate, confidence, image_data, plate_crop,
+          timestamp, video_time_sec } = plate;
+  const conf     = (confidence * 100).toFixed(1);
+  const confPct  = parseFloat(conf);
+  const cls      = confPct >= 85 ? 'hi' : confPct >= 70 ? 'md' : 'lo';
+  const ts       = timestamp || '—';
+  const vidTs    = (isVideo && video_time_sec != null)
+                   ? formatSeconds(Math.round(video_time_sec))
+                   : null;
+
+  document.getElementById('emptyState').style.display    = 'none';
+  document.getElementById('clearBtn').style.display      = 'block';
+  document.getElementById('counterBadge').style.display  = 'block';
+  document.getElementById('hintLbl').style.display       = 'inline';
+
+  // === UPDATE card hiện có ===
+  if (plateMap[license_plate]) {
+    const card     = plateMap[license_plate];
+    const prevConf = parseFloat(card.dataset.conf);
+    if (confPct <= prevConf) return; // không có cải thiện
+
+    // Cập nhật ảnh crop
+    const cropImg = card.querySelector('.card-crop img');
+    const cropPh  = card.querySelector('.card-crop .crop-placeholder');
+    if (cropImg) safeLoadImage(cropImg, plate_crop, cropPh, '[CROP LỖI]');
+
+    // Cập nhật full frame
+    const thumbImg = card.querySelector('.card-thumb img');
+    const thumbPh  = card.querySelector('.card-thumb .thumb-placeholder');
+    if (thumbImg) safeLoadImage(thumbImg, image_data, thumbPh, '[IMG LỖI]');
+
+    // Cập nhật confidence
+    const cv = card.querySelector('.conf-val');
+    if (cv) { cv.textContent = conf + '%'; cv.className = `conf-val ${cls}`; }
+    const cf = card.querySelector('.conf-fill');
+    if (cf) cf.style.width = conf + '%';
+
+    // Cập nhật timestamp
+    const tv = card.querySelector('.time-val');
+    if (tv) tv.textContent = ts;
+    const vts = card.querySelector('.video-ts');
+    if (vts && vidTs) { vts.textContent = '⏱ ' + vidTs; vts.style.display = 'inline'; }
+
+    // Update tag
+    const ut = card.querySelector('.update-tag');
+    if (ut) ut.style.display = 'block';
+
+    card.dataset.imageData    = image_data || '';
+    card.dataset.plateCrop    = plate_crop || '';
+    card.dataset.conf         = conf;
+    card.dataset.videoTimeSec = video_time_sec ?? '';
+    card.dataset.timestamp    = ts;
+
+    card.classList.remove('flash');
+    void card.offsetWidth;
+    card.classList.add('flash');
+    return;
+  }
+
+  // === TẠO card mới ===
+  const cnt  = Object.keys(plateMap).length + 1;
+  const card = document.createElement('div');
+  card.className = 'plate-card';
+  card.dataset.plate        = license_plate;
+  card.dataset.imageData    = image_data || '';
+  card.dataset.plateCrop    = plate_crop || '';
+  card.dataset.conf         = conf;
+  card.dataset.videoTimeSec = video_time_sec ?? '';
+  card.dataset.timestamp    = ts;
+
+  const vidTsHtml = vidTs
+    ? `<span class="video-ts">⏱ ${vidTs}</span>`
+    : '';
+
+  card.innerHTML = `
+    <div class="card-crop">
+      <img alt="crop" style="display:none">
+      <div class="crop-placeholder">[ĐANG TẢI...]</div>
+      <span class="crop-lbl">BIỂN SỐ</span>
+    </div>
+    <div class="card-thumb">
+      <img alt="${license_plate}" style="display:none">
+      <div class="thumb-placeholder">[ĐANG TẢI...]</div>
+      <div class="img-loading">⏳ ĐANG TẢI...</div>
+      <div class="card-badge">#${cnt}</div>
+      <div class="update-tag">★ CẬP NHẬT</div>
+      <div class="view-hint">🔍 CHI TIẾT</div>
+    </div>
+    <div class="card-body">
+      <div class="plate-num">${license_plate}</div>
+      <div class="conf-row">
+        <span class="conf-lbl">CONF</span>
+        <span class="conf-val ${cls}">${conf}%</span>
+        <div class="conf-track"><div class="conf-fill" style="width:${conf}%"></div></div>
+      </div>
+      <div class="card-footer">
+        <span class="time-val">${ts}</span>
+        ${vidTsHtml}
+      </div>
+    </div>`;
+
+  // Load ảnh an toàn sau khi DOM sẵn sàng
+  requestAnimationFrame(() => {
+    const cropImg = card.querySelector('.card-crop img');
+    const cropPh  = card.querySelector('.card-crop .crop-placeholder');
+    safeLoadImage(cropImg, plate_crop, cropPh, '[NO CROP]');
+
+    const thumbImg = card.querySelector('.card-thumb img');
+    const thumbPh  = card.querySelector('.card-thumb .thumb-placeholder');
+    safeLoadImage(thumbImg, image_data, thumbPh, '[NO IMG]');
+  });
+
+  card.addEventListener('click', () => openModal(card));
+  document.getElementById('grid').prepend(card);
+  plateMap[license_plate] = card;
+
+  const total = Object.keys(plateMap).length;
+  document.getElementById('counterBadge').textContent = total + ' BIỂN SỐ';
+  document.getElementById('statPlates').textContent   = total;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════
+function openModal(card) {
+  const plate   = card.dataset.plate;
+  const conf    = card.dataset.conf;
+  const imgD    = card.dataset.imageData;
+  const crop    = card.dataset.plateCrop;
+  const vidSec  = card.dataset.videoTimeSec;
+  const ts      = card.dataset.timestamp;
+  const pct     = parseFloat(conf);
+  const color   = pct >= 85 ? 'var(--green)' : pct >= 70 ? 'var(--yellow)' : 'var(--orange)';
+
+  document.getElementById('modalPlate').textContent = plate;
+  document.getElementById('modalConf').innerHTML =
+    `ĐỘ TIN CẬY: <span style="color:${color};font-weight:700">${conf}%</span>`;
+
+  // Timestamp
+  const tsEl = document.getElementById('modalTs');
+  if (isVideo && vidSec) {
+    tsEl.textContent = `⏱ VIDEO: ${formatSeconds(Math.round(parseFloat(vidSec)))}`;
+    tsEl.style.display = 'inline';
+  } else if (ts && ts !== '—') {
+    tsEl.textContent = `🕐 ${ts}`;
+    tsEl.style.display = 'inline';
+  } else {
+    tsEl.style.display = 'none';
+  }
+
+  // Clear cũ
+  const cWrap = document.getElementById('modalCropWrap');
+  const fWrap = document.getElementById('modalFullWrap');
+  cWrap.querySelectorAll('.modal-no-img').forEach(e => e.remove());
+  fWrap.querySelectorAll('.modal-no-img').forEach(e => e.remove());
+
+  const cImg = document.getElementById('modalCropImg');
+  const fImg = document.getElementById('modalFullImg');
+
+  const cropSrc = makeImgSrc(crop);
+  const imgSrc  = makeImgSrc(imgD);
+
+  if (cropSrc) {
+    cImg.src = cropSrc;
+    cImg.style.display = 'block';
+  } else {
+    cImg.style.display = 'none';
+    const ph = document.createElement('div');
+    ph.className = 'modal-no-img';
+    ph.textContent = '[ KHÔNG CÓ ẢNH CROP ]';
+    cWrap.appendChild(ph);
+  }
+
+  if (imgSrc) {
+    fImg.src = imgSrc;
+    fImg.style.display = 'block';
+  } else {
+    fImg.style.display = 'none';
+    const ph = document.createElement('div');
+    ph.className = 'modal-no-img';
+    ph.textContent = '[ KHÔNG CÓ FULL FRAME ]';
+    fWrap.appendChild(ph);
+  }
+
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+function closeBg(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+function setScanning(on) {
+  isScanning = on;
+  const btn     = document.getElementById('runBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const badge   = document.getElementById('liveBadge');
+  const prev    = document.getElementById('previewWrap');
+  btn.disabled    = on;
+  btn.textContent = on ? '⏳ ĐANG XỬ LÝ...' : '▶ BẮT ĐẦU';
+  stopBtn.style.display = (on && isVideo) ? 'block' : 'none';
+  badge.classList.toggle('scanning', on);
+  document.getElementById('liveText').textContent = on ? 'ĐANG QUÉT...' : 'SERVER ONLINE';
+  prev.classList.toggle('scanning-anim', on);
+  if (on) {
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('statsSection').style.display    = 'block';
+  } else {
+    if (statsTimer) clearInterval(statsTimer);
+  }
+}
+
+function setProgress(pct, label, detail) {
+  const p = Math.min(100, Math.max(0, pct));
+  document.getElementById('progFill').style.width   = p + '%';
+  document.getElementById('progLabel').textContent  = label;
+  document.getElementById('progDetail').textContent = detail || '';
+}
+
+function startStatsTimer() {
+  if (statsTimer) clearInterval(statsTimer);
+  statsTimer = setInterval(() => {
+    const s = ((Date.now() - scanStart) / 1000).toFixed(0);
+    document.getElementById('statTime').textContent = s + 'S';
+  }, 500);
+}
+
+function clearResults() {
+  document.getElementById('grid').innerHTML = '';
+  document.getElementById('emptyState').style.display    = 'flex';
+  document.getElementById('clearBtn').style.display      = 'none';
+  document.getElementById('counterBadge').style.display  = 'none';
+  document.getElementById('statsSection').style.display  = 'none';
+  document.getElementById('hintLbl').style.display       = 'none';
+  plateMap = {}; cardCount = 0; _totalFrames = 0;
+  if (statsTimer) clearInterval(statsTimer);
+  document.getElementById('vtFill').style.width = '0%';
+  document.getElementById('vtTime').textContent = '00:00';
+  toast('ĐÃ XÓA TẤT CẢ KẾT QUẢ');
+}
+
+function toast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show' + (isErr ? ' err' : '');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => { t.className = ''; }, 3400);
+}
+</script>
+</body>
+</html>

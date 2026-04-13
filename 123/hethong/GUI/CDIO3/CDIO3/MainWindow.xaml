@@ -1,0 +1,122 @@
+﻿<Window x:Class="CDIO3.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CDIO3"
+        mc:Ignorable="d"
+Title="Hệ Thống Vận Hành Bãi Xe" Height="700" Width="1200" Background="#F0F0F0">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <GroupBox Header="CỬA VÀO (ENTRY GATE)" Grid.Column="0" Margin="10" FontWeight="Bold" Foreground="DarkBlue">
+            <DockPanel LastChildFill="True">
+                <Border DockPanel.Dock="Top" Height="280" Background="Black" Margin="5" CornerRadius="5">
+                    <Grid>
+                        <Image Name="imgEntryCamera" Stretch="Uniform"/>
+                        <TextBlock Text="CAMERA LÀN VÀO" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.3"/>
+                    </Grid>
+                </Border>
+
+                <Border DockPanel.Dock="Top" Name="brdCustomerStatus" Background="#E0E0E0" Height="40" Margin="5,0" CornerRadius="5">
+                    <TextBlock Name="txtCustomerStatus" Text="ĐANG CHỜ XE..." VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="16" FontWeight="Bold"/>
+                </Border>
+
+                <StackPanel Margin="10">
+                    <Label Content="Biển số nhận diện:"/>
+                    <TextBox Name="txtEntryPlate" FontSize="26" FontWeight="Bold" TextAlignment="Center" Foreground="Blue"/>
+
+                    <StackPanel Name="pnlCustomerInfo" Visibility="Visible" Margin="0,10,0,0">
+                        <Border BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Width="50" Height="50" Fill="LightGray" Grid.Column="0"/>
+
+                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                    <TextBlock Name="lblCustomerName" Text="NGUYỄN VĂN A" FontSize="16" FontWeight="Bold"/>
+                                    <TextBlock Name="lblCustomerPhone" Text="SĐT: 090xxxx123" Foreground="Gray"/>
+                                    <TextBlock Name="lblExpiryDate" Text="Hạn dùng: 31/12/2026" Foreground="Red" FontSize="12"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <Grid Margin="0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                            <Label Content="Loại xe:"/>
+                            <ComboBox Name="cbEntryVehicleType">
+                                <ComboBoxItem Content="Xe máy"/>
+                                <ComboBoxItem Content="Ô tô"/>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                            <Label Content="Vùng đỗ:"/>
+                            <TextBox Name="txtEntrySlot" Text="A-101" VerticalContentAlignment="Center" Height="25"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Button Content="XÁC NHẬN VÀO"
+                            Height="50"
+                            Background="#27ae60"
+                            Foreground="White"
+                            FontSize="18"
+                            FontWeight="Bold"
+                            Click="BtnConfirmEntry_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </GroupBox>
+
+        <GroupBox Header="CỬA RA (EXIT GATE)" Grid.Column="1" Margin="10" FontWeight="Bold" Foreground="DarkRed">
+            <DockPanel LastChildFill="True">
+                <Border DockPanel.Dock="Top" Height="300" Background="Black" Margin="5" CornerRadius="5">
+                    <Grid>
+                        <Image Name="imgExitCamera" Stretch="Uniform"/>
+                        <TextBlock Text="CAMERA LÀN RA" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.3"/>
+                    </Grid>
+                </Border>
+
+                <StackPanel Margin="10">
+                    <Label Content="Biển số xe ra:"/>
+                    <TextBox Name="txtExitPlate" FontSize="24" FontWeight="Bold" TextAlignment="Center" Margin="0,5"/>
+
+                    <Border Background="#FFE4E4" Padding="10" CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Text="THÔNG TIN THANH TOÁN" HorizontalAlignment="Center" TextDecorations="Underline"/>
+                            <Grid Margin="0,5">
+                                <TextBlock Text="Giờ vào:"/>
+                                <TextBlock Name="lblTimeIn" Text="01/02/2026 08:00" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Grid Margin="0,5">
+                                <TextBlock Text="Tổng thời gian:"/>
+                                <TextBlock Name="lblTotalHour" Text="2 giờ 30 phút" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Separator Margin="0,5"/>
+                            <Grid>
+                                <TextBlock Text="THÀNH TIỀN:" FontSize="18" FontWeight="Bold"/>
+                                <TextBlock Name="lblAmount" Text="30,000 VNĐ" FontSize="20" FontWeight="Bold" Foreground="Red" HorizontalAlignment="Right"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Button x:Name="btnConfirmExit"
+                            Content="XÁC NHẬN THANH TOÁN &amp; RA"
+                            Height="50"
+                            Background="DarkRed"
+                            Foreground="White"
+                            Margin="0,20,0,0"
+                            Click="BtnConfirmExit_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </GroupBox>
+    </Grid>
+</Window>

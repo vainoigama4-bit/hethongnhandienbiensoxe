@@ -1,0 +1,83 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Code\\C#\\CDIO3\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|d:\\code\\c#\\cdio3\\cdio3\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|solutionrelative:cdio3\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|D:\\Code\\C#\\CDIO3\\cdio3\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|solutionrelative:cdio3\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|D:\\Code\\C#\\CDIO3\\cdio3\\app.config||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|solutionrelative:cdio3\\app.config||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|D:\\Code\\C#\\CDIO3\\cdio3\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{CF7843B7-4500-4770-975F-0F5054A688E9}|CDIO3\\CDIO3.csproj|solutionrelative:cdio3\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 100,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "App.xaml",
+              "DocumentMoniker": "D:\\Code\\C#\\CDIO3\\CDIO3\\App.xaml",
+              "RelativeDocumentMoniker": "CDIO3\\App.xaml",
+              "ToolTip": "D:\\Code\\C#\\CDIO3\\CDIO3\\App.xaml",
+              "RelativeToolTip": "CDIO3\\App.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-03-04T12:30:20.299Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "App.config",
+              "DocumentMoniker": "D:\\Code\\C#\\CDIO3\\CDIO3\\App.config",
+              "RelativeDocumentMoniker": "CDIO3\\App.config",
+              "ToolTip": "D:\\Code\\C#\\CDIO3\\CDIO3\\App.config",
+              "RelativeToolTip": "CDIO3\\App.config",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000601|",
+              "WhenOpened": "2026-03-04T12:30:16.425Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "D:\\Code\\C#\\CDIO3\\CDIO3\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "CDIO3\\MainWindow.xaml.cs",
+              "ToolTip": "D:\\Code\\C#\\CDIO3\\CDIO3\\MainWindow.xaml.cs*",
+              "RelativeToolTip": "CDIO3\\MainWindow.xaml.cs*",
+              "ViewState": "AgIAAM0AAAAAAAAAAADwv80AAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-04T00:26:44.973Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "D:\\Code\\C#\\CDIO3\\CDIO3\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "CDIO3\\MainWindow.xaml",
+              "ToolTip": "D:\\Code\\C#\\CDIO3\\CDIO3\\MainWindow.xaml",
+              "RelativeToolTip": "CDIO3\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-03-04T08:01:27.769Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
