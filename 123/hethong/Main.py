@@ -29,8 +29,11 @@ THAY ĐỔI v6 (FIX TẤT CẢ LỖI):
    - Format MM:SS chính xác theo thời gian video
    - Gửi frame_idx trong mỗi event để client tự tính
 
-5. HIỆU NĂNG:
+5. HIỆU NĂNG & STREAMING:
    - STEP = round(fps) để xử lý 1 frame/giây (chính xác hơn 2fps)
+   - [v6.1] Gửi progress event MỖI STEP thay vì STEP*10
+     → Thanh tiến trình cập nhật mỗi giây video (mượt mà hơn)
+     → Frontend đồng bộ được video preview với vị trí đang quét
    - Bộ nhớ đệm (deque) để tránh xử lý frame giống nhau
    - Thread-safe stop event
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -186,14 +189,13 @@ _SIGN_BLACKLIST = {
 }
 
 # Pattern biển số VN hợp lệ (chỉ cho video — ảnh tĩnh không áp dụng)
-# Dạng: 2 chữ số + 1 chữ (mã tỉnh) + 4-5 số, hoặc biển xe máy 2 hàng
 _VN_PLATE_PATTERNS = [
-    re.compile(r'^\d{2}[A-Z]\d{4,5}$'),           # 51A12345 (ô tô)
-    re.compile(r'^\d{2}[A-Z]{1,2}\d{3,5}$'),       # 51AB1234 (xe con)
-    re.compile(r'^\d{2}[A-Z]\d{3}\.\d{2}$'),       # 51A123.45 (xe máy 2 hàng)
-    re.compile(r'^\d{2}[A-Z]\d{2}\.\d{3}$'),       # 51A12.345
-    re.compile(r'^\d{1}[A-Z]\d{4,5}$'),            # 1A12345 (biển đặc biệt)
-    re.compile(r'^\d{2}[A-Z]\d{4,5}[A-Z]?$'),      # với hậu tố
+    re.compile(r'^\d{2}[A-Z]\d{4,5}$'),
+    re.compile(r'^\d{2}[A-Z]{1,2}\d{3,5}$'),
+    re.compile(r'^\d{2}[A-Z]\d{3}\.\d{2}$'),
+    re.compile(r'^\d{2}[A-Z]\d{2}\.\d{3}$'),
+    re.compile(r'^\d{1}[A-Z]\d{4,5}$'),
+    re.compile(r'^\d{2}[A-Z]\d{4,5}[A-Z]?$'),
 ]
 
 
@@ -202,14 +204,11 @@ def normalize_vn_plate(text: str) -> str:
     s = list(text.upper().strip())
     if len(s) < 4:
         return ''.join(s)
-    # 2 ký tự đầu phải là số (mã tỉnh)
     for i in range(min(2, len(s))):
         if s[i] in _LETTER_TO_DIGIT:
             s[i] = _LETTER_TO_DIGIT[s[i]]
-    # Ký tự thứ 3 phải là chữ (series)
     if len(s) > 2 and s[2].isdigit():
         s[2] = _DIGIT_TO_LETTER.get(s[2], s[2])
-    # Các ký tự còn lại phải là số
     for i in range(3, len(s)):
         if s[i] in _LETTER_TO_DIGIT:
             s[i] = _LETTER_TO_DIGIT[s[i]]
@@ -227,60 +226,44 @@ def matches_vn_pattern(text: str) -> bool:
 def is_real_plate(text: str, strict: bool = True) -> bool:
     """
     Kiểm tra kết quả OCR có thực sự là biển số không.
-
     strict=True  (video): Áp dụng tất cả bộ lọc + pattern VN
-    strict=False (image): Chỉ lọc cơ bản (tránh loại nhầm biển nước ngoài)
+    strict=False (image): Chỉ lọc cơ bản
     """
     t = text.strip().upper()
-    # Loại khoảng trắng và ký tự đặc biệt (trừ dấu chấm trong biển xe máy)
     t_clean = re.sub(r'[^A-Z0-9.]', '', t)
 
-    # Độ dài hợp lệ
     if not (4 <= len(t_clean) <= 12):
         return False
-    # Phải có số và chữ
     if not any(c.isdigit() for c in t_clean):
         return False
     if not any(c.isalpha() for c in t_clean):
         return False
-    # Phải có ít nhất 2 chữ số liên tiếp
     if not re.search(r'\d{2,}', t_clean):
         return False
 
-    # === CHẶN TRIỆT ĐỂ "LỐI RA" VÀ CÁC BIẾN THỂ OCR ===
-    # L có thể bị OCR thành 1, O thành 0, I thành 1
     loi_variants = re.sub(r'[L1][O0][I1]R[A4]', 'LOIRA', t_clean)
     if 'LOIRA' in loi_variants:
         return False
-    # Kiểm tra trực tiếp các pattern
-    if re.search(r'L[O0][I1]', t_clean):  # LOI, L0I, L01...
+    if re.search(r'L[O0][I1]', t_clean):
         return False
     if re.search(r'[L1][O0]IR', t_clean):
         return False
 
-    # Kiểm tra blacklist
     t_no_dot = t_clean.replace('.', '')
     if t_no_dot in _SIGN_BLACKLIST or t_clean in _SIGN_BLACKLIST:
         return False
 
-    # Loại chuỗi toàn chữ liên tiếp > 4 ký tự (bảng hiệu)
     if re.search(r'[A-Z]{5,}', t_clean):
         return False
 
-    # Loại chuỗi lặp bất thường (> 75%) — chỉ loại chuỗi rõ ràng là noise
-    # Ví dụ: AAAAAAA (100%), 00000000 (100%), không loại 30F00000 (6/8 = 75%)
     char_counts = Counter(t_clean)
     if char_counts.most_common(1)[0][1] / len(t_clean) > 0.75:
         return False
 
     if strict:
-        # Với video: ưu tiên pattern VN nhưng không bắt buộc
-        # (vẫn cho qua nếu có cấu trúc số-chữ-số hợp lý)
         if not matches_vn_pattern(t_clean):
-            # Kiểm tra cấu trúc tổng quát: phải bắt đầu bằng số
             if not t_clean[0].isdigit():
                 return False
-            # Phải có ít nhất 3 chữ số
             if sum(1 for c in t_clean if c.isdigit()) < 3:
                 return False
 
@@ -314,10 +297,7 @@ def is_valid_plate_box_image(box, frame_shape) -> bool:
 
 
 def is_valid_plate_box_video(box, frame_shape) -> bool:
-    """
-    Bộ lọc VIDEO — cân bằng giữa độ nhạy và độ chính xác.
-    Nới rộng để bắt biển nhỏ/xa nhưng vẫn loại bảng hiệu lớn.
-    """
+    """Bộ lọc VIDEO — cân bằng độ nhạy và độ chính xác."""
     x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
     w = x2 - x1
     h = y2 - y1
@@ -328,23 +308,17 @@ def is_valid_plate_box_video(box, frame_shape) -> bool:
     area = w * h
 
     if area < 500:
-        return False   # quá nhỏ (noise)
+        return False
     if w < 35:
-        return False   # quá hẹp
+        return False
     if h < 12:
-        return False   # quá thấp
-
-    # Aspect ratio: biển xe máy 2 hàng (~1.3), ô tô (~4-5)
+        return False
     if aspect < 0.80 or aspect > 9.0:
         return False
-
-    # Loại bảng hiệu chiếm nhiều màn hình
     if w > fw * 0.75:
         return False
     if h > fh * 0.45:
         return False
-
-    # Loại box quá cao ở đầu frame (thường là bảng hiệu treo trên cao)
     if y1 < fh * 0.05 and h > fh * 0.20:
         return False
 
@@ -356,9 +330,7 @@ def is_valid_plate_box_video(box, frame_shape) -> bool:
 # ═══════════════════════════════════════════════════════════════
 
 def predict_license_plate(frame, is_video: bool = False):
-    """
-    Pipeline nhận diện biển số với ensemble OCR để tối đa độ chính xác.
-    """
+    """Pipeline nhận diện biển số với ensemble OCR."""
     if is_video:
         yolo_results = yolo(frame, imgsz=1280, conf=0.30, verbose=False)
     else:
@@ -389,13 +361,11 @@ def predict_license_plate(frame, is_video: bool = False):
         if crop.size == 0:
             continue
 
-        # Ensemble OCR
         plate_text, ocr_conf = recognize_with_ensemble(crop)
 
         if not plate_text:
             continue
 
-        # Tránh duplicate
         if plate_text in seen_texts:
             continue
 
@@ -413,12 +383,12 @@ def predict_license_plate(frame, is_video: bool = False):
 # ═══════════════════════════════════════════════════════════════
 
 class PlateBuffer:
-    BUFFER_SIZE = 5   # Tăng buffer để vote chính xác hơn
-    MIN_RATIO   = 0.40  # ≥40% đồng thuận
+    BUFFER_SIZE = 5
+    MIN_RATIO   = 0.40
 
     def __init__(self):
         self._buf: dict[str, deque]   = {}
-        self._conf: dict[str, deque]  = {}  # confidence history
+        self._conf: dict[str, deque]  = {}
 
     def _key(self, box, frame_shape, grid: int = 12) -> str:
         x1, y1, x2, y2 = box[:4]
@@ -436,14 +406,12 @@ class PlateBuffer:
         self._conf[key].append(conf)
         buf = self._buf[key]
 
-        # Weighted vote: text có tổng confidence cao nhất thắng
         weight_map: dict[str, float] = {}
         count_map: dict[str, int]    = {}
         for t, c in zip(self._buf[key], self._conf[key]):
             weight_map[t] = weight_map.get(t, 0.0) + c
             count_map[t]  = count_map.get(t, 0) + 1
 
-        # Lấy text thắng theo weight
         best = max(weight_map, key=lambda t: weight_map[t])
         ratio = count_map[best] / len(buf)
         return best if ratio >= self.MIN_RATIO else None
@@ -508,18 +476,13 @@ def resize_for_encode(frame, max_w=MAX_ENCODE_WIDTH, max_h=MAX_ENCODE_HEIGHT):
 
 
 def to_b64(frame, quality=65):
-    """
-    Encode frame sang base64 JPEG.
-    quality=65 cho full-frame (nhỏ, nhanh, đủ hiển thị)
-    quality=85 cho crop biển số (cần rõ hơn để đọc)
-    """
+    """Encode frame sang base64 JPEG."""
     frame_resized = resize_for_encode(frame)
     ok, buf = cv2.imencode('.jpg', frame_resized,
                            [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not ok or buf is None:
         return ''
     encoded = base64.b64encode(buf).decode('utf-8')
-    # Validate: base64 hợp lệ phải > 1000 chars cho ảnh thực
     if len(encoded) < 200:
         return ''
     return encoded
@@ -586,8 +549,8 @@ def api_recognize_image():
             annotated = draw_annotation(annotated, plate_text, conf, padded_box)
             save_image_unique(img_arr, plate_text)
 
-            img_b64  = to_b64(annotated, quality=65)   # full frame nhỏ
-            crop_b64 = to_b64(crop, quality=90)         # crop rõ hơn
+            img_b64  = to_b64(annotated, quality=65)
+            crop_b64 = to_b64(crop, quality=90)
 
             if not img_b64 or not crop_b64:
                 continue
@@ -612,9 +575,25 @@ def api_recognize_image():
 @app.route('/api/recognize_video', methods=['POST'])
 def api_recognize_video():
     """
-    Video SSE — 1 FRAME/GIÂY (chính xác hơn 2fps với video ~12fps).
-    Timestamp đồng bộ theo thời gian video thực.
-    Ensemble OCR + strict plate filter.
+    Video SSE — 1 FRAME/GIÂY.
+    
+    [v6.1 — STREAMING LIÊN TỤC]
+    ───────────────────────────────────────────────────────────
+    Thay đổi chính so với v6:
+    
+    • Trước: progress heartbeat gửi mỗi STEP*10 frames
+             → Frontend chỉ nhận update mỗi ~10 giây video
+             → Thanh tiến trình nhảy cóc, video preview không đồng bộ
+    
+    • Sau:   progress heartbeat gửi mỗi STEP frames (= mỗi 1 giây video)
+             → Frontend nhận update liên tục, đủ để seek video preview
+             → Thanh tiến trình chạy mượt mà theo thời gian thực
+    
+    Logic:
+      - Nếu frame có biển số → gửi event "plate" (đã chứa progress + video_time_sec)
+      - Nếu frame KHÔNG có biển số → gửi event "progress" với video_time_sec
+      → Client luôn biết server đang ở giây bao nhiêu của video
+    ───────────────────────────────────────────────────────────
     """
     if 'file' not in request.files:
         return Response(
@@ -641,7 +620,7 @@ def api_recognize_video():
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             fps_orig     = cap.get(cv2.CAP_PROP_FPS) or 25
 
-            # 1 FRAME/GIÂY — phù hợp với video bãi xe (không nhiều chuyển động nhanh)
+            # 1 FRAME/GIÂY
             STEP = max(1, round(fps_orig / 1))
 
             yield sse({
@@ -662,9 +641,12 @@ def api_recognize_video():
                 if not ret:
                     break
 
-                progress = round(frame_idx / max(total_frames, 1) * 100, 1)
+                progress     = round(frame_idx / max(total_frames, 1) * 100, 1)
+                video_time   = round(frame_idx / fps_orig, 2)
 
                 if frame_idx % STEP == 0:
+                    found_plate_this_frame = False
+
                     try:
                         frame_results = predict_license_plate(frame, is_video=True)
                         active_keys   = set()
@@ -676,13 +658,12 @@ def api_recognize_video():
                             voted = buf.feed(padded_box, frame.shape,
                                              plate_text, ocr_conf)
                             if voted is None:
-                                voted = plate_text  # fallback
+                                voted = plate_text
 
                             prev_conf = best_plates.get(voted, {}).get(
                                 "confidence", 0.0)
                             is_update = prev_conf > 0
 
-                            # Chỉ update khi confidence thực sự cao hơn
                             if ocr_conf > prev_conf:
                                 annotated = draw_annotation(
                                     frame.copy(), voted, ocr_conf, padded_box)
@@ -700,36 +681,43 @@ def api_recognize_video():
                                     "crop":       crop_b64,
                                 }
 
-                                # TIMESTAMP ĐỒNG BỘ VỚI VIDEO
                                 ts = frame_to_video_ts(frame_idx, fps_orig)
 
+                                # Gửi plate event — đã bao gồm progress + video_time_sec
+                                # Frontend dùng video_time_sec để seek video preview
                                 yield sse({
-                                    "type":          "plate",
-                                    "license_plate": voted,
-                                    "confidence":    ocr_conf,
-                                    "image_data":    img_b64,
-                                    "plate_crop":    crop_b64,
-                                    "progress":      progress,
-                                    "frame_idx":     frame_idx,
-                                    "video_time_sec": round(frame_idx / fps_orig, 2),
-                                    "is_update":     is_update,
-                                    "timestamp":     ts,
+                                    "type":           "plate",
+                                    "license_plate":  voted,
+                                    "confidence":     ocr_conf,
+                                    "image_data":     img_b64,
+                                    "plate_crop":     crop_b64,
+                                    "progress":       progress,
+                                    "frame_idx":      frame_idx,
+                                    "video_time_sec": video_time,
+                                    "is_update":      is_update,
+                                    "timestamp":      ts,
                                 })
+                                found_plate_this_frame = True
 
                         buf.cleanup(active_keys)
 
                     except Exception:
                         import traceback; traceback.print_exc()
 
-                # Heartbeat progress mỗi ~10 giây thực
-                if frame_idx % (STEP * 10) == 0 and frame_idx > 0:
-                    yield sse({
-                        "type":     "progress",
-                        "progress": progress,
-                        "frame":    frame_idx,
-                        "found":    len(best_plates),
-                        "video_time_sec": round(frame_idx / fps_orig, 2),
-                    })
+                    # ─────────────────────────────────────────────────────
+                    # [v6.1 FIX] Gửi progress MỖI frame được xử lý
+                    # (bất kể có tìm thấy biển số hay không)
+                    # → Frontend nhận update mỗi 1 giây video
+                    # → Có thể seek video preview theo video_time_sec
+                    # ─────────────────────────────────────────────────────
+                    if not found_plate_this_frame:
+                        yield sse({
+                            "type":           "progress",
+                            "progress":       progress,
+                            "frame":          frame_idx,
+                            "found":          len(best_plates),
+                            "video_time_sec": video_time,
+                        })
 
                 frame_idx += 1
 
@@ -756,16 +744,13 @@ def api_recognize_video():
 
 if __name__ == '__main__':
     print("=" * 68)
-    print("  ALPR SERVER v6 → http://127.0.0.1:5000")
+    print("  ALPR SERVER v6.1 → http://127.0.0.1:5000")
     print("")
-    print("  THAY ĐỔI v6:")
-    print("  • ENSEMBLE OCR: 5 preprocessing variants, weighted voting")
-    print("  • FIX TÀN HÌNH: resize ≤1280px trước encode, quality=65/90")
-    print("  • FIX LỐI RA: blacklist mở rộng + pattern regex LOI variants")
-    print("  • TIMESTAMP: đồng bộ theo thời gian video (frame/fps)")
-    print("  • 1 FRAME/GIÂY cho bãi xe (STEP = round(fps))")
-    print("  • conf=0.30 YOLO + strict VN plate pattern filter")
-    print("  • PlateBuffer: weighted confidence voting, BUFFER=5")
-    print("  • Validate base64 length phía server")
+    print("  THAY ĐỔI v6.1 — STREAMING LIÊN TỤC:")
+    print("  • Progress gửi mỗi 1 giây video (trước: mỗi 10 giây)")
+    print("  • Event 'plate'    → có biển số: gửi kèm video_time_sec")
+    print("  • Event 'progress' → không có:  gửi video_time_sec")
+    print("  → Frontend seek video preview theo từng giây quét")
+    print("  → Thanh tiến trình cập nhật liên tục, không nhảy cóc")
     print("=" * 68)
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
