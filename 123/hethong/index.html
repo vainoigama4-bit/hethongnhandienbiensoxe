@@ -95,13 +95,23 @@ header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px
 .prev-ph{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;padding:12px;}
 #previewWrap.scanning-anim{border-color:var(--accent);box-shadow:0 0 12px rgba(0,212,255,.25);}
 
+/* Scan overlay — hiển thị dòng quét chạy ngang qua video khi đang scan */
+#scanLine{
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),var(--green),transparent);
+  box-shadow:0 0 8px var(--accent);
+  pointer-events:none;display:none;z-index:5;
+  transition:top .4s ease-out;
+}
+#previewWrap.scanning-anim #scanLine{display:block;}
+
 /* Video time indicator */
 #videoTimeBar{display:none;margin-top:8px;}
 .vt-row{display:flex;align-items:center;gap:8px;}
 .vt-label{font-family:var(--mono);font-size:9px;color:var(--dim);flex-shrink:0;}
-.vt-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.vt-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;cursor:pointer;}
 .vt-fill{height:100%;width:0%;border-radius:2px;
-  background:linear-gradient(90deg,var(--green),var(--accent));transition:width .3s;}
+  background:linear-gradient(90deg,var(--green),var(--accent));transition:width .6s ease-out;}
 .vt-time{font-family:var(--mono);font-size:10px;color:var(--accent);flex-shrink:0;min-width:42px;text-align:right;}
 
 /* Progress */
@@ -109,7 +119,7 @@ header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px
 .prog-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
 .prog-fill{height:100%;width:0%;border-radius:3px;
   background:linear-gradient(90deg,var(--accent),var(--green));
-  transition:width .4s ease-out;box-shadow:0 0 8px var(--accent);}
+  transition:width .6s ease-out;box-shadow:0 0 8px var(--accent);}
 .prog-label{font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:5px;text-align:center;}
 .prog-detail{font-family:var(--mono);font-size:9px;color:var(--dim);text-align:center;margin-top:2px;}
 
@@ -199,7 +209,6 @@ header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px
 .thumb-placeholder{display:flex;align-items:center;justify-content:center;
   width:100%;height:100%;font-family:var(--mono);font-size:8px;
   color:var(--dim);letter-spacing:1px;}
-/* Loading spinner */
 .img-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.7);font-family:var(--mono);font-size:9px;color:var(--dim);
   letter-spacing:1px;}
@@ -288,7 +297,7 @@ header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px
   <div class="logo">🚗</div>
   <div class="brand">
     <h1>HỆ THỐNG NHẬN DIỆN BIỂN SỐ XE</h1>
-    <p>ALPR v6 // YOLO + CNN ENSEMBLE // 1FPS // SMART FILTER // VN PLATE</p>
+    <p>ALPR v6.1 // YOLO + CNN ENSEMBLE // 1FPS // REAL-TIME SYNC // VN PLATE</p>
   </div>
   <div class="header-right">
     <div class="counter-badge" id="counterBadge">0 BIỂN SỐ</div>
@@ -331,7 +340,9 @@ header::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px
       <div id="previewWrap">
         <div class="prev-ph">[ CHƯA CÓ FILE ]</div>
         <img id="imgPrev" alt="preview">
-        <video id="vidPrev" controls></video>
+        <video id="vidPrev" muted playsinline></video>
+        <!-- Dòng quét chạy dọc video khi server đang xử lý -->
+        <div id="scanLine"></div>
       </div>
       <!-- Video timeline bar -->
       <div id="videoTimeBar">
@@ -445,23 +456,20 @@ let _totalFrames  = 0;
 let _videoFps     = 25;
 let _totalDurSec  = 0;
 
+// ─────────────────────────────────────────────────────────────
+// [v6.1] VIDEO SYNC STATE
+// Theo dõi giây video hiện tại để seek preview đồng bộ với server
+// ─────────────────────────────────────────────────────────────
+let _lastSyncSec  = -1;    // giây video lần cuối đã seek
+let _seekThrottle = null;  // throttle timer để tránh seek quá nhiều
+
 // ═══════════════════════════════════════════════════════════════
-// BASE64 VALIDATION — FIX TÀN HÌNH
+// BASE64 VALIDATION
 // ═══════════════════════════════════════════════════════════════
-/**
- * Kiểm tra chuỗi base64 JPEG hợp lệ trước khi tạo src.
- * Nguyên nhân chính gây tàn hình:
- *   1. Server trả về '' hoặc null khi encode lỗi
- *   2. Chuỗi quá ngắn (< 1000 chars) — không phải ảnh thực
- *   3. Ký tự không hợp lệ trong base64
- */
 function isValidBase64(str) {
   if (!str || typeof str !== 'string') return false;
-  // JPEG base64 phải bắt đầu bằng /9j/ (FFD8FF)
   if (!str.startsWith('/9j/') && str.length < 1000) return false;
-  // Độ dài tối thiểu cho ảnh JPEG hợp lệ
   if (str.length < 500) return false;
-  // Kiểm tra ký tự base64 hợp lệ (loại trừ newline/space cuối)
   const cleaned = str.replace(/[\r\n =]/g, '');
   return /^[A-Za-z0-9+/]*={0,2}$/.test(cleaned.slice(-4));
 }
@@ -471,13 +479,6 @@ function makeImgSrc(b64) {
   return `data:image/jpeg;base64,${b64}`;
 }
 
-/**
- * Load ảnh với retry và timeout — tránh trường hợp ảnh load lỗi im lặng.
- * @param {HTMLImageElement} imgEl - Element img cần load
- * @param {string} b64 - Chuỗi base64
- * @param {HTMLElement} placeholder - Element hiển thị khi lỗi
- * @param {string} placeholderText - Text hiển thị khi lỗi
- */
 function safeLoadImage(imgEl, b64, placeholder, placeholderText) {
   const src = makeImgSrc(b64);
   if (!src) {
@@ -488,13 +489,9 @@ function safeLoadImage(imgEl, b64, placeholder, placeholderText) {
     imgEl.style.display = 'none';
     return false;
   }
-
-  // Xoá placeholder cũ nếu có
   if (placeholder) placeholder.style.display = 'none';
-
   imgEl.onload = () => {
     imgEl.style.display = 'block';
-    // Xoá loading indicator nếu có
     const li = imgEl.closest('.card-thumb, .card-crop')
                     ?.querySelector('.img-loading');
     if (li) li.remove();
@@ -541,6 +538,8 @@ function previewMedia() {
   } else {
     vid.src = url;
     vid.style.display = 'block';
+    vid.pause();
+    vid.currentTime = 0;
     document.getElementById('videoTimeBar').style.display = 'block';
   }
   document.getElementById('fileInfo').style.display = 'block';
@@ -549,6 +548,50 @@ function previewMedia() {
   document.getElementById('fiMeta').textContent =
     (file.type.startsWith('image/') ? 'ẢNH' : 'VIDEO') + ' · ' +
     (file.size / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// [v6.1] SYNC VIDEO PREVIEW VỚI SCANNING POSITION
+// ═══════════════════════════════════════════════════════════════
+/**
+ * Seek video preview đến đúng giây server đang xử lý.
+ * Throttle 300ms để tránh seek liên tục gây giật.
+ *
+ * @param {number} sec - Giây video (video_time_sec từ SSE)
+ */
+function syncVideoToTime(sec) {
+  if (!isVideo || sec == null || !isScanning) return;
+  const vid = document.getElementById('vidPrev');
+  if (!vid || !vid.src) return;
+
+  // Chỉ seek nếu chênh lệch > 0.3s và video đã load xong
+  const diff = Math.abs(vid.currentTime - sec);
+  if (diff < 0.3) return;
+
+  // Throttle: không seek quá 1 lần mỗi 300ms
+  if (_seekThrottle) return;
+  _seekThrottle = setTimeout(() => { _seekThrottle = null; }, 300);
+
+  // Pause trước khi seek (tránh auto-play tiếp tục)
+  vid.pause();
+  vid.currentTime = sec;
+  _lastSyncSec = sec;
+
+  // Cập nhật scan line position (phần trăm chiều cao)
+  updateScanLine(sec);
+}
+
+/**
+ * Di chuyển dòng quét dọc theo preview tương ứng với % tiến trình.
+ * Dòng này trượt từ trên xuống dưới theo thời gian video.
+ */
+function updateScanLine(sec) {
+  const line = document.getElementById('scanLine');
+  const wrap = document.getElementById('previewWrap');
+  if (!line || !wrap || !_totalDurSec) return;
+  const pct = Math.min(1, sec / _totalDurSec);
+  const wrapH = wrap.offsetHeight;
+  line.style.top = Math.round(pct * wrapH) + 'px';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -572,7 +615,7 @@ async function runRecognition() {
   const file = fileInput.files[0];
   isVideo = file.type.startsWith('video/') ||
             /\.(mp4|avi|mov|mkv|webm|m4v)$/i.test(file.name);
-  _totalFrames = 0; _videoFps = 25; _totalDurSec = 0;
+  _totalFrames = 0; _videoFps = 25; _totalDurSec = 0; _lastSyncSec = -1;
   setScanning(true);
   scanStart = Date.now();
   startStatsTimer();
@@ -634,7 +677,7 @@ async function runVideoStream(file) {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
-      buffer = lines.pop(); // phần chưa hoàn chỉnh
+      buffer = lines.pop();
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         try {
@@ -668,6 +711,15 @@ function handleSSE(ev) {
       _totalDurSec = ev.duration_sec || Math.round(_totalFrames / _videoFps);
       const durStr = formatSeconds(_totalDurSec);
       setProgress(0, 'ĐANG QUÉT VIDEO...', `${durStr} · ${_videoFps.toFixed(1)}FPS · 1 FRAME/S`);
+
+      // [v6.1] Reset video preview về đầu, ẩn controls, chờ server seek
+      const vid = document.getElementById('vidPrev');
+      if (vid && isVideo) {
+        vid.pause();
+        vid.currentTime = 0;
+        // Ẩn controls gốc khi đang scan — timeline bar của chúng ta thay thế
+        vid.removeAttribute('controls');
+      }
       break;
     }
 
@@ -681,11 +733,13 @@ function handleSSE(ev) {
         timestamp:      ev.timestamp,
         video_time_sec: ev.video_time_sec,
       });
-      const pct     = ev.progress ?? 0;
-      const vidSec  = ev.video_time_sec ?? (ev.frame_idx / _videoFps);
-      const total   = Object.keys(plateMap).length;
 
-      // Cập nhật video timeline
+      const pct    = ev.progress ?? 0;
+      const vidSec = ev.video_time_sec ?? (ev.frame_idx / _videoFps);
+      const total  = Object.keys(plateMap).length;
+
+      // [v6.1] Seek video preview đến frame server vừa xử lý
+      syncVideoToTime(vidSec);
       updateVideoTimeline(vidSec);
 
       setProgress(
@@ -701,7 +755,12 @@ function handleSSE(ev) {
     case 'progress': {
       const pct    = ev.progress ?? 0;
       const vidSec = ev.video_time_sec ?? (ev.frame / _videoFps);
+
+      // [v6.1] Đây là event chính để sync — server gửi mỗi giây video
+      // → Seek video preview liên tục theo server
+      syncVideoToTime(vidSec);
       updateVideoTimeline(vidSec);
+
       setProgress(
         pct,
         `ĐANG QUÉT... ${pct.toFixed(0)}%`,
@@ -714,12 +773,16 @@ function handleSSE(ev) {
 
     case 'stopped':
       toast('⏹ ĐÃ DỪNG QUÉT');
+      // Khôi phục controls video
+      document.getElementById('vidPrev').setAttribute('controls', '');
       break;
 
     case 'done':
       toast(`✓ QUÉT XONG — ${ev.total_plates} BIỂN SỐ`);
       setProgress(100, 'HOÀN TẤT!', `TỔNG: ${ev.total_plates} BIỂN SỐ`);
       updateVideoTimeline(_totalDurSec);
+      // Khôi phục controls video để user xem lại
+      document.getElementById('vidPrev').setAttribute('controls', '');
       break;
 
     case 'error':
@@ -771,31 +834,26 @@ function addOrUpdateCard(plate) {
   if (plateMap[license_plate]) {
     const card     = plateMap[license_plate];
     const prevConf = parseFloat(card.dataset.conf);
-    if (confPct <= prevConf) return; // không có cải thiện
+    if (confPct <= prevConf) return;
 
-    // Cập nhật ảnh crop
     const cropImg = card.querySelector('.card-crop img');
     const cropPh  = card.querySelector('.card-crop .crop-placeholder');
     if (cropImg) safeLoadImage(cropImg, plate_crop, cropPh, '[CROP LỖI]');
 
-    // Cập nhật full frame
     const thumbImg = card.querySelector('.card-thumb img');
     const thumbPh  = card.querySelector('.card-thumb .thumb-placeholder');
     if (thumbImg) safeLoadImage(thumbImg, image_data, thumbPh, '[IMG LỖI]');
 
-    // Cập nhật confidence
     const cv = card.querySelector('.conf-val');
     if (cv) { cv.textContent = conf + '%'; cv.className = `conf-val ${cls}`; }
     const cf = card.querySelector('.conf-fill');
     if (cf) cf.style.width = conf + '%';
 
-    // Cập nhật timestamp
     const tv = card.querySelector('.time-val');
     if (tv) tv.textContent = ts;
     const vts = card.querySelector('.video-ts');
     if (vts && vidTs) { vts.textContent = '⏱ ' + vidTs; vts.style.display = 'inline'; }
 
-    // Update tag
     const ut = card.querySelector('.update-tag');
     if (ut) ut.style.display = 'block';
 
@@ -853,7 +911,6 @@ function addOrUpdateCard(plate) {
       </div>
     </div>`;
 
-  // Load ảnh an toàn sau khi DOM sẵn sàng
   requestAnimationFrame(() => {
     const cropImg = card.querySelector('.card-crop img');
     const cropPh  = card.querySelector('.card-crop .crop-placeholder');
@@ -890,7 +947,6 @@ function openModal(card) {
   document.getElementById('modalConf').innerHTML =
     `ĐỘ TIN CẬY: <span style="color:${color};font-weight:700">${conf}%</span>`;
 
-  // Timestamp
   const tsEl = document.getElementById('modalTs');
   if (isVideo && vidSec) {
     tsEl.textContent = `⏱ VIDEO: ${formatSeconds(Math.round(parseFloat(vidSec)))}`;
@@ -902,7 +958,6 @@ function openModal(card) {
     tsEl.style.display = 'none';
   }
 
-  // Clear cũ
   const cWrap = document.getElementById('modalCropWrap');
   const fWrap = document.getElementById('modalFullWrap');
   cWrap.querySelectorAll('.modal-no-img').forEach(e => e.remove());
@@ -958,17 +1013,37 @@ function setScanning(on) {
   const stopBtn = document.getElementById('stopBtn');
   const badge   = document.getElementById('liveBadge');
   const prev    = document.getElementById('previewWrap');
+  const scanLn  = document.getElementById('scanLine');
+
   btn.disabled    = on;
   btn.textContent = on ? '⏳ ĐANG XỬ LÝ...' : '▶ BẮT ĐẦU';
   stopBtn.style.display = (on && isVideo) ? 'block' : 'none';
   badge.classList.toggle('scanning', on);
   document.getElementById('liveText').textContent = on ? 'ĐANG QUÉT...' : 'SERVER ONLINE';
   prev.classList.toggle('scanning-anim', on);
+
   if (on) {
     document.getElementById('progressSection').style.display = 'block';
     document.getElementById('statsSection').style.display    = 'block';
+    if (isVideo) {
+      // [v6.1] Chuẩn bị video để nhận seek từ server
+      const vid = document.getElementById('vidPrev');
+      if (vid) {
+        vid.pause();
+        vid.currentTime = 0;
+        vid.removeAttribute('controls');  // ẩn controls gốc, dùng timeline bar
+      }
+      if (scanLn) scanLn.style.top = '0px';
+    }
   } else {
     if (statsTimer) clearInterval(statsTimer);
+    // Khôi phục controls video + ẩn scan line
+    if (isVideo) {
+      const vid = document.getElementById('vidPrev');
+      if (vid) vid.setAttribute('controls', '');
+    }
+    if (scanLn) scanLn.style.display = 'none';
+    _lastSyncSec = -1;
   }
 }
 
